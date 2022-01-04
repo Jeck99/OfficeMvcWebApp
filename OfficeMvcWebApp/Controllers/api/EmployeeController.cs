@@ -12,19 +12,16 @@ namespace OfficeMvcWebApp.Controllers.api
     public class EmployeeController : ApiController
     {
         //connection string point to the database (server name, database name, security policy)
-        string connectionString = "Data Source=server name;Initial Catalog=OfficeDatabase;Integrated Security=True;Pooling=False";
+        static string connectionString = "Data Source=server name;Initial Catalog=OfficeDatabase;Integrated Security=True;Pooling=False";
+        static EmployeeDataClassesDataContext dataContext = new EmployeeDataClassesDataContext(connectionString);
         // GET: api/Employee
         public IHttpActionResult Get()
         {
             //try-catch for exceptions
             try
             {
-                //using and cleaning of SqlConnection object
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    List<Employee> employees = GetAllEmployees(connection);
-                    return Ok(new { employees });
-                }
+                List<Employee> employees = GetAllEmployees();
+                return Ok(new { employees });
             }
             catch (SqlException sqlEx)
             {
@@ -40,11 +37,8 @@ namespace OfficeMvcWebApp.Controllers.api
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    Employee employee = GetEmployee(connection,id);
-                    return Ok(new { employee });
-                }
+                Employee employee = GetEmployee(id);
+                return Ok(new { employee });
             }
             catch (SqlException sqlEx)
             {
@@ -61,12 +55,8 @@ namespace OfficeMvcWebApp.Controllers.api
             //try-catch for exceptions
             try
             {
-                //using and cleaning of SqlConnection object
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    int rows = AddNewEmployee(employee, connection);
-                    return Ok(new { rows });
-                }
+                AddNewEmployee(employee);
+                return Ok("success");
             }
             catch (SqlException sqlEx)
             {
@@ -82,11 +72,9 @@ namespace OfficeMvcWebApp.Controllers.api
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    int rows = UpdateEmployee(employee,id, connection);
-                    return Ok(new { rows });
-                }
+                UpdateEmployee(employee, id);
+                return Ok("success");
+
             }
             catch (SqlException sqlEx)
             {
@@ -102,11 +90,8 @@ namespace OfficeMvcWebApp.Controllers.api
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    int rows = DeleteEmployee(connection,id);
-                    return Ok(new { rows });
-                }
+                DeleteEmployee(id);
+                return Ok("success");
             }
             catch (SqlException sqlEx)
             {
@@ -117,83 +102,49 @@ namespace OfficeMvcWebApp.Controllers.api
                 return BadRequest(ex.Message);
             }
         }
-        
-        // functions using the ADO.NET
-        /// <summary>
+
+        // functions using the Linq to SQL
         /// retriving the data from Employees table, using SELECT
-        /// </summary>
-        /// <param type="SqlConnection" name="connection"></param>
-        /// <returns> List<Employee> list of emplyees object</returns>
-        private static List<Employee> GetAllEmployees(SqlConnection connection)
+        private static List<Employee> GetAllEmployees()
         {
             List<Employee> listOfEmploeeys = new List<Employee>();
-            connection.Open();
-            string query = @"SELECT * FROM Employees";
-            SqlCommand command = new SqlCommand(query, connection);
-            SqlDataReader dataFromDB = command.ExecuteReader();
-            if (dataFromDB.HasRows)
+            var resultQuery = from employee in dataContext.Employees select employee;
+            if (resultQuery.Any())
             {
-                //pop data into the list
-                while (dataFromDB.Read())
-                {
-                    listOfEmploeeys.Add(new Employee(dataFromDB.GetString(1), dataFromDB.GetString(2), dataFromDB.GetInt32(3), dataFromDB.GetDateTime(4), dataFromDB.GetString(5)));
-                }
+                listOfEmploeeys = resultQuery.ToList();
             }
-            connection.Close();
             return listOfEmploeeys;
         }
         /// <returns> List<Employee> list of emplyees object</returns>
-        private static Employee GetEmployee(SqlConnection connection,int id)
+        private static Employee GetEmployee(int id)
         {
-            List<Employee> listOfEmploeeys = new List<Employee>();
-            connection.Open();
-            string query = $@"SELECT * FROM Employees WHERE Id = {id}";
-            SqlCommand command = new SqlCommand(query, connection);
-            SqlDataReader dataFromDB = command.ExecuteReader();
-            if (dataFromDB.HasRows)
+            Employee employeeResult = new Employee();
+            var resultQuery = from employee in dataContext.Employees where employee.Id == id select employee;
+            if (resultQuery.Any())
             {
-                while (dataFromDB.Read())
-                {
-                    listOfEmploeeys.Add(new Employee(dataFromDB.GetString(1), dataFromDB.GetString(2), dataFromDB.GetInt32(3), dataFromDB.GetDateTime(4), dataFromDB.GetString(5)));
-                }
+                employeeResult = resultQuery.ToList()[0];
             }
-            connection.Close();
-            return listOfEmploeeys[0];
+            return employeeResult;
         }
-        // adding new entry to the Employees table, using INSERT INTO
-        private static int AddNewEmployee(Employee employee, SqlConnection connection)
+        // adding new entry to the Employees table
+        private static void AddNewEmployee(Employee employee)
         {
-            connection.Open();
-            string query = $@"INSERT INTO Employees(first_name,last_name,age,birthday,email)
-                                    VALUES('{employee.FirstName}','{employee.LastName}',{employee.Age},'{employee.Birthday}','{employee.Email}')";
-            SqlCommand command = new SqlCommand(query, connection);
-            int rowsEffected = command.ExecuteNonQuery();
-            connection.Close();
-            return rowsEffected;
+            dataContext.Employees.InsertOnSubmit(employee);
+            dataContext.SubmitChanges();
         }
-        // updating an existing entry in the Employees table, using UPDATE-SET
-        private static int UpdateEmployee(Employee employee, int id, SqlConnection connection)
+        // updating an existing entry in the Employees table
+        private static void UpdateEmployee(Employee employee, int id)
         {
-            connection.Open();
-            string query = $@"UPDATE Employees 
-                                SET first_name = '{employee.FirstName}', last_name='{employee.LastName}', age={employee.Age}, birthday='{employee.Birthday}', email='{employee.Email}'
-            WHERE Id = {id}";
-            SqlCommand command = new SqlCommand(query, connection);
-            int rowsEffected = command.ExecuteNonQuery();
-            connection.Close();
-            return rowsEffected;
-
+            Employee employeeToUpdate = dataContext.Employees.FirstOrDefault(employeeItem => employeeItem.Id == id);
+            employeeToUpdate = employee;
+            dataContext.SubmitChanges();
         }
-        // deleting an existing entry in Employees table, using DELETE
-        private static int DeleteEmployee(SqlConnection connection, int id)
+        // deleting an existing entry in Employees table
+        private static void DeleteEmployee(int id)
         {
-            connection.Open();
-            string query = $@"DELETE FROM Employees
-                                    WHERE Id = {id}";
-            SqlCommand command = new SqlCommand(query, connection);
-            int rowEffected = command.ExecuteNonQuery();
-            connection.Close();
-            return rowEffected;
+            Employee employeeToUpdate = dataContext.Employees.FirstOrDefault(employeeItem => employeeItem.Id == id);
+            dataContext.Employees.DeleteOnSubmit(employeeToUpdate);
+            dataContext.SubmitChanges();
         }
     }
 }
