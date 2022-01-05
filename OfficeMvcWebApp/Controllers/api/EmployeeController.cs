@@ -20,7 +20,7 @@ namespace OfficeMvcWebApp.Controllers.api
             //try-catch for exceptions
             try
             {
-                List<Employee> employees = GetAllEmployees();
+                List<Employee> employees = dataContext.Employees.ToList();
                 return Ok(new { employees });
             }
             catch (SqlException sqlEx)
@@ -37,7 +37,7 @@ namespace OfficeMvcWebApp.Controllers.api
         {
             try
             {
-                Employee employee = GetEmployee(id);
+                Employee employee = dataContext.Employees.First((employeeItem) => employeeItem.Id == id);
                 return Ok(new { employee });
             }
             catch (SqlException sqlEx)
@@ -55,7 +55,8 @@ namespace OfficeMvcWebApp.Controllers.api
             //try-catch for exceptions
             try
             {
-                AddNewEmployee(employee);
+                dataContext.Employees.InsertOnSubmit(employee);
+                dataContext.SubmitChanges();
                 return Ok("success");
             }
             catch (SqlException sqlEx)
@@ -72,7 +73,9 @@ namespace OfficeMvcWebApp.Controllers.api
         {
             try
             {
-                UpdateEmployee(employee, id);
+                Employee employeeToUpdate = dataContext.Employees.Single(employeeItem => employeeItem.Id == id);
+                employeeToUpdate = employee;
+                dataContext.SubmitChanges();
                 return Ok("success");
 
             }
@@ -90,7 +93,9 @@ namespace OfficeMvcWebApp.Controllers.api
         {
             try
             {
-                DeleteEmployee(id);
+                Employee employee = dataContext.Employees.First(employeeItem => employeeItem.Id == id);
+                dataContext.Employees.DeleteOnSubmit(employee);
+                dataContext.SubmitChanges();
                 return Ok("success");
             }
             catch (SqlException sqlEx)
@@ -101,50 +106,6 @@ namespace OfficeMvcWebApp.Controllers.api
             {
                 return BadRequest(ex.Message);
             }
-        }
-
-        // functions using the Linq to SQL
-        /// retriving the data from Employees table, using SELECT
-        private static List<Employee> GetAllEmployees()
-        {
-            List<Employee> listOfEmploeeys = new List<Employee>();
-            var resultQuery = from employee in dataContext.Employees select employee;
-            if (resultQuery.Any())
-            {
-                listOfEmploeeys = resultQuery.ToList();
-            }
-            return listOfEmploeeys;
-        }
-        /// <returns> List<Employee> list of emplyees object</returns>
-        private static Employee GetEmployee(int id)
-        {
-            Employee employeeResult = new Employee();
-            var resultQuery = from employee in dataContext.Employees where employee.Id == id select employee;
-            if (resultQuery.Any())
-            {
-                employeeResult = resultQuery.ToList()[0];
-            }
-            return employeeResult;
-        }
-        // adding new entry to the Employees table
-        private static void AddNewEmployee(Employee employee)
-        {
-            dataContext.Employees.InsertOnSubmit(employee);
-            dataContext.SubmitChanges();
-        }
-        // updating an existing entry in the Employees table
-        private static void UpdateEmployee(Employee employee, int id)
-        {
-            Employee employeeToUpdate = dataContext.Employees.FirstOrDefault(employeeItem => employeeItem.Id == id);
-            employeeToUpdate = employee;
-            dataContext.SubmitChanges();
-        }
-        // deleting an existing entry in Employees table
-        private static void DeleteEmployee(int id)
-        {
-            Employee employeeToUpdate = dataContext.Employees.FirstOrDefault(employeeItem => employeeItem.Id == id);
-            dataContext.Employees.DeleteOnSubmit(employeeToUpdate);
-            dataContext.SubmitChanges();
         }
     }
 }
